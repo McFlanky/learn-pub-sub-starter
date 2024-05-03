@@ -16,14 +16,14 @@ func main() {
 
 	conn, err := amqp.Dial(rabbitConnString)
 	if err != nil {
-		log.Fatalf("failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("could not connect to RabbitMQ: %v", err)
 	}
 	defer conn.Close()
 	fmt.Println("Peril game client connected to RabbitMQ!")
 
 	publishCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("failed to create a channel: %v", err)
+		log.Fatalf("could not create channel: %v", err)
 	}
 
 	username, err := gamelogic.ClientWelcome()
@@ -38,12 +38,22 @@ func main() {
 		routing.ArmyMovesPrefix+"."+gs.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs),
+		handlerMove(gs, publishCh),
 	)
 	if err != nil {
 		log.Fatalf("could not subscribe to army moves: %v", err)
 	}
-
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs),
+	)
+	if err != nil {
+		log.Fatalf("could not subscribe to war declarations: %v", err)
+	}
 	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
@@ -95,8 +105,9 @@ func main() {
 			fmt.Println("Spamming not allowed yet!")
 		case "quit":
 			gamelogic.PrintQuit()
+			return
 		default:
-			fmt.Println("Unknown command")
+			fmt.Println("unknown command")
 		}
 	}
 }
