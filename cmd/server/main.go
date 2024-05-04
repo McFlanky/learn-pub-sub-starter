@@ -25,17 +25,17 @@ func main() {
 		log.Fatalf("could not create channel: %v", err)
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.SimpleQueueDurable,
+		handlerLogs(),
 	)
 	if err != nil {
-		log.Fatalf("could not subscribe to game log: %v", err)
+		log.Fatalf("could not starting consuming logs: %v", err)
 	}
-	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	gamelogic.PrintServerHelp()
 
@@ -46,7 +46,7 @@ func main() {
 		}
 		switch words[0] {
 		case "pause":
-			fmt.Println("Publishing game state")
+			fmt.Println("Publishing paused game state")
 			err = pubsub.PublishJSON(
 				publishCh,
 				routing.ExchangePerilDirect,
@@ -72,10 +72,10 @@ func main() {
 				log.Printf("could not publish time: %v", err)
 			}
 		case "quit":
-			log.Println("Quitting the game server...Goodbye!")
+			log.Println("goodbye")
 			return
 		default:
-			fmt.Println("Unknown command")
+			fmt.Println("unknown command")
 		}
 	}
 }
